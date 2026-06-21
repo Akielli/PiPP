@@ -11,6 +11,7 @@ from models import (
     EmpresaInfo,
     ProyectoConContrato,
     ProyectoInfo,
+    ProyectoMapa,
     UnidadResumen,
 )
 
@@ -46,7 +47,31 @@ async def listar_unidades(conn: asyncpg.Connection = Depends(get_conn)):
     return [UnidadResumen(**dict(r)) for r in rows]
 
 
-# ── 2. Detalle de una unidad territorial ─────────────────────────────────────
+# ── 2. Todos los proyectos para el mapa ──────────────────────────────────────
+
+@router.get("/proyectos", response_model=list[ProyectoMapa])
+async def proyectos_mapa(conn: asyncpg.Connection = Depends(get_conn)):
+    rows = await conn.fetch("""
+        SELECT
+            p.id,
+            p.nombre,
+            p.lat,
+            p.lng,
+            ut.nombre   AS unidad_territorial,
+            ut.alcaldia,
+            c.nivel_riesgo,
+            c.id        AS contrato_id,
+            e.razon_social
+        FROM proyecto p
+        JOIN unidad_territorial ut ON ut.id = p.ut_id
+        LEFT JOIN contrato c ON c.proyecto_id = p.id
+        LEFT JOIN empresa  e ON e.id = c.empresa_id
+        ORDER BY ut.alcaldia, p.nombre
+    """)
+    return [ProyectoMapa(**dict(r)) for r in rows]
+
+
+# ── 3. Detalle de una unidad territorial ─────────────────────────────────────
 
 @router.get("/unidades/{ut_id}", response_model=UnidadResumen)
 async def detalle_unidad(

@@ -7,6 +7,7 @@ import {
   ArrowRight,
   AlertTriangle,
   RefreshCw,
+  Map as MapIcon,
 } from 'lucide-react'
 import { fetchUnidades, type UnidadResumen } from '@/lib/api'
 
@@ -82,10 +83,22 @@ export default function Home() {
             <span style={{ color: '#e8971f' }}>de tu colonia?</span>
           </h1>
 
-          <p className="text-[#8d97ae] text-base md:text-lg max-w-xl leading-relaxed mb-10">
+          <p className="text-[#8d97ae] text-base md:text-lg max-w-xl leading-relaxed mb-7">
             Consulta proyectos, montos y contratos del presupuesto participativo
             de la Ciudad de México. Toda la información es pública.
           </p>
+
+          {/* Acceso rápido al mapa */}
+          <div className="mb-10">
+            <Link
+              to="/mapa"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold transition-opacity hover:opacity-90"
+              style={{ backgroundColor: '#e8971f', color: '#1b2032' }}
+            >
+              <MapIcon size={14} />
+              Ver proyectos en el mapa
+            </Link>
+          </div>
 
           {/* Totales globales */}
           {status === 'ok' && (

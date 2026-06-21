@@ -90,3 +90,23 @@ export async function fetchContrato(id: string): Promise<ContratoDetalle> {
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return res.json()
 }
+
+// ── Tipos y fetch para el mapa ────────────────────────────────────────────────
+
+export type ProyectoMapa = {
+  id: string
+  nombre: string
+  lat: number
+  lng: number
+  unidad_territorial: string
+  alcaldia: string
+  nivel_riesgo: 'bajo' | 'medio' | 'alto' | null
+  contrato_id: string | null
+  razon_social: string | null
+}
+
+export async function fetchProyectosMapa(): Promise<ProyectoMapa[]> {
+  const res = await fetch('/api/proyectos')
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+}

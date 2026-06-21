@@ -57,6 +57,18 @@ class ProyectoInfo(BaseModel):
     alcaldia: str
 
 
+class ProyectoMapa(BaseModel):
+    id: UUID
+    nombre: str
+    lat: float
+    lng: float
+    unidad_territorial: str
+    alcaldia: str
+    nivel_riesgo: str | None = None
+    contrato_id: UUID | None = None
+    razon_social: str | None = None
+
+
 class ContratoDetalle(BaseModel):
     id: UUID
     modalidad: str
