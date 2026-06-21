@@ -146,6 +146,7 @@ async def detalle_contrato(
             c.avance_pct,
             c.nivel_riesgo,
             p.id               AS proyecto_id,
+            p.ut_id,
             p.nombre           AS proyecto_nombre,
             p.anio,
             p.monto_asignado,
@@ -183,6 +184,7 @@ async def detalle_contrato(
         nivel_riesgo=row["nivel_riesgo"],
         proyecto=ProyectoInfo(
             id=row["proyecto_id"],
+            ut_id=row["ut_id"],
             nombre=row["proyecto_nombre"],
             anio=row["anio"],
             monto_asignado=row["monto_asignado"],

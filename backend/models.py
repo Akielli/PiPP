@@ -47,6 +47,7 @@ class EmpresaInfo(BaseModel):
 
 class ProyectoInfo(BaseModel):
     id: UUID
+    ut_id: UUID
     nombre: str
     anio: int
     monto_asignado: float
