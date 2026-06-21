@@ -46,7 +46,34 @@ async def listar_unidades(conn: asyncpg.Connection = Depends(get_conn)):
     return [UnidadResumen(**dict(r)) for r in rows]
 
 
-# ── 2. Proyectos de una unidad territorial ────────────────────────────────────
+# ── 2. Detalle de una unidad territorial ─────────────────────────────────────
+
+@router.get("/unidades/{ut_id}", response_model=UnidadResumen)
+async def detalle_unidad(
+    ut_id: UUID,
+    conn: asyncpg.Connection = Depends(get_conn),
+):
+    row = await conn.fetchrow("""
+        SELECT
+            ut.id,
+            ut.nombre,
+            ut.alcaldia,
+            ut.lat,
+            ut.lng,
+            COUNT(DISTINCT p.id)      AS num_proyectos,
+            COALESCE(SUM(c.monto), 0) AS monto_total
+        FROM unidad_territorial ut
+        LEFT JOIN proyecto p ON p.ut_id = ut.id
+        LEFT JOIN contrato c ON c.proyecto_id = p.id
+        WHERE ut.id = $1
+        GROUP BY ut.id
+    """, ut_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"Unidad territorial {ut_id} no encontrada")
+    return UnidadResumen(**dict(row))
+
+
+# ── 3. Proyectos de una unidad territorial ────────────────────────────────────
 
 @router.get("/unidades/{ut_id}/proyectos", response_model=list[ProyectoConContrato])
 async def proyectos_de_unidad(
@@ -68,6 +95,7 @@ async def proyectos_de_unidad(
             p.lat,
             p.lng,
             e.razon_social,
+            c.id         AS contrato_id,
             c.modalidad,
             c.monto,
             c.avance_pct,
@@ -84,6 +112,7 @@ async def proyectos_de_unidad(
         contrato = None
         if r["modalidad"] is not None:
             contrato = ContratoResumen(
+                id=r["contrato_id"],
                 razon_social=r["razon_social"],
                 modalidad=r["modalidad"],
                 monto=r["monto"],

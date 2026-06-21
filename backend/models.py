@@ -14,6 +14,7 @@ class UnidadResumen(BaseModel):
 
 
 class ContratoResumen(BaseModel):
+    id: UUID | None = None
     razon_social: str | None = None
     modalidad: str | None = None
     monto: float | None = None
