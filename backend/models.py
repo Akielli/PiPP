@@ -20,6 +20,7 @@ class ContratoResumen(BaseModel):
     monto: float | None = None
     avance_pct: int | None = None
     nivel_riesgo: str | None = None
+    estado_plazo: str | None = None
 
 
 class ProyectoConContrato(BaseModel):
@@ -75,5 +76,12 @@ class ContratoDetalle(BaseModel):
     monto: float
     avance_pct: int
     nivel_riesgo: str
+    estado_plazo: str | None = None
+    fecha_contratacion_plan: date | None = None
+    fecha_contratacion_real: date | None = None
+    fecha_inicio_plan: date | None = None
+    fecha_inicio_real: date | None = None
+    fecha_termino_plan: date | None = None
+    fecha_termino_real: date | None = None
     proyecto: ProyectoInfo
     empresa: EmpresaInfo

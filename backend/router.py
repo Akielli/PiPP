@@ -1,3 +1,4 @@
+from datetime import date as date_type
 from uuid import UUID
 from typing import AsyncGenerator
 
@@ -16,6 +17,23 @@ from models import (
 )
 
 router = APIRouter(prefix="/api")
+
+
+# ── Utilidad: estado de plazo derivado ────────────────────────────────────────
+
+def calcular_estado_plazo(
+    avance_pct: int,
+    termino_plan: date_type | None,
+    termino_real: date_type | None,
+) -> str | None:
+    if termino_plan is None:
+        return None
+    if termino_real is not None:
+        return "a_tiempo" if termino_real <= termino_plan else "retrasado"
+    hoy = date_type.today()
+    if hoy <= termino_plan:
+        return "a_tiempo"
+    return "retrasado" if avance_pct >= 50 else "detenido"
 
 
 # ── Dependencia: conexión del pool ────────────────────────────────────────────
@@ -120,11 +138,13 @@ async def proyectos_de_unidad(
             p.lat,
             p.lng,
             e.razon_social,
-            c.id         AS contrato_id,
+            c.id               AS contrato_id,
             c.modalidad,
             c.monto,
             c.avance_pct,
-            c.nivel_riesgo
+            c.nivel_riesgo,
+            c.fecha_termino_plan,
+            c.fecha_termino_real
         FROM proyecto p
         LEFT JOIN contrato c ON c.proyecto_id = p.id
         LEFT JOIN empresa  e ON e.id = c.empresa_id
@@ -143,6 +163,11 @@ async def proyectos_de_unidad(
                 monto=r["monto"],
                 avance_pct=r["avance_pct"],
                 nivel_riesgo=r["nivel_riesgo"],
+                estado_plazo=calcular_estado_plazo(
+                    r["avance_pct"],
+                    r["fecha_termino_plan"],
+                    r["fecha_termino_real"],
+                ),
             )
         resultado.append(ProyectoConContrato(
             id=r["id"],
@@ -170,6 +195,12 @@ async def detalle_contrato(
             c.monto,
             c.avance_pct,
             c.nivel_riesgo,
+            c.fecha_contratacion_plan,
+            c.fecha_contratacion_real,
+            c.fecha_inicio_plan,
+            c.fecha_inicio_real,
+            c.fecha_termino_plan,
+            c.fecha_termino_real,
             p.id               AS proyecto_id,
             p.ut_id,
             p.nombre           AS proyecto_nombre,
@@ -207,6 +238,17 @@ async def detalle_contrato(
         monto=row["monto"],
         avance_pct=row["avance_pct"],
         nivel_riesgo=row["nivel_riesgo"],
+        estado_plazo=calcular_estado_plazo(
+            row["avance_pct"],
+            row["fecha_termino_plan"],
+            row["fecha_termino_real"],
+        ),
+        fecha_contratacion_plan=row["fecha_contratacion_plan"],
+        fecha_contratacion_real=row["fecha_contratacion_real"],
+        fecha_inicio_plan=row["fecha_inicio_plan"],
+        fecha_inicio_real=row["fecha_inicio_real"],
+        fecha_termino_plan=row["fecha_termino_plan"],
+        fecha_termino_real=row["fecha_termino_real"],
         proyecto=ProyectoInfo(
             id=row["proyecto_id"],
             ut_id=row["ut_id"],

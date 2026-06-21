@@ -32,27 +32,15 @@ const MODALIDAD_LABEL: Record<string, string> = {
 }
 
 const RIESGO_CONFIG = {
-  alto: {
-    label: 'Alto',
-    border: '#dc2626',
-    badgeBg: '#fee2e2',
-    badgeText: '#991b1b',
-    dot: '#dc2626',
-  },
-  medio: {
-    label: 'Medio',
-    border: '#d97706',
-    badgeBg: '#fef3e2',
-    badgeText: '#92400e',
-    dot: '#d97706',
-  },
-  bajo: {
-    label: 'Bajo',
-    border: '#059669',
-    badgeBg: '#d1fae5',
-    badgeText: '#065f46',
-    dot: '#059669',
-  },
+  alto:  { label: 'Alto',  border: '#dc2626', badgeBg: '#fee2e2', badgeText: '#991b1b', dot: '#dc2626' },
+  medio: { label: 'Medio', border: '#d97706', badgeBg: '#fef3e2', badgeText: '#92400e', dot: '#d97706' },
+  bajo:  { label: 'Bajo',  border: '#059669', badgeBg: '#d1fae5', badgeText: '#065f46', dot: '#059669' },
+} as const
+
+const PLAZO_CONFIG = {
+  a_tiempo:  { label: 'A tiempo',  badgeBg: '#d1fae5', badgeText: '#065f46', dot: '#059669' },
+  retrasado: { label: 'Retrasado', badgeBg: '#fef3e2', badgeText: '#92400e', dot: '#d97706' },
+  detenido:  { label: 'Detenido',  badgeBg: '#fee2e2', badgeText: '#991b1b', dot: '#dc2626' },
 } as const
 
 // ── Página ────────────────────────────────────────────────────────────────────
@@ -217,6 +205,9 @@ function ProyectoCard({ proyecto }: { proyecto: ProyectoConContrato }) {
   const riesgo = c?.nivel_riesgo && c.nivel_riesgo in RIESGO_CONFIG
     ? RIESGO_CONFIG[c.nivel_riesgo as keyof typeof RIESGO_CONFIG]
     : null
+  const plazo = c?.estado_plazo && c.estado_plazo in PLAZO_CONFIG
+    ? PLAZO_CONFIG[c.estado_plazo as keyof typeof PLAZO_CONFIG]
+    : null
 
   const cardContent = (
     <div
@@ -226,25 +217,41 @@ function ProyectoCard({ proyecto }: { proyecto: ProyectoConContrato }) {
     >
       <div className="p-6">
 
-        {/* Fila superior: semáforo + año */}
-        <div className="flex items-center justify-between mb-4">
-          {riesgo ? (
-            <span
-              className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
-              style={{ backgroundColor: riesgo.badgeBg, color: riesgo.badgeText }}
-              aria-label={`Nivel de riesgo: ${riesgo.label}`}
-            >
+        {/* Fila superior: semáforos + año */}
+        <div className="flex items-start justify-between gap-2 mb-4">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {riesgo ? (
               <span
-                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                style={{ backgroundColor: riesgo.dot }}
-                aria-hidden="true"
-              />
-              Riesgo {riesgo.label}
-            </span>
-          ) : (
-            <span className="text-xs text-[#b0ada6]">Sin contrato</span>
-          )}
-          <div className="flex items-center gap-1 text-[#9ca3af] text-xs">
+                className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
+                style={{ backgroundColor: riesgo.badgeBg, color: riesgo.badgeText }}
+                aria-label={`Nivel de riesgo: ${riesgo.label}`}
+              >
+                <span
+                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: riesgo.dot }}
+                  aria-hidden="true"
+                />
+                Riesgo {riesgo.label}
+              </span>
+            ) : (
+              <span className="text-xs text-[#b0ada6]">Sin contrato</span>
+            )}
+            {plazo && (
+              <span
+                className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
+                style={{ backgroundColor: plazo.badgeBg, color: plazo.badgeText }}
+                aria-label={`Estado de plazo: ${plazo.label}`}
+              >
+                <span
+                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: plazo.dot }}
+                  aria-hidden="true"
+                />
+                {plazo.label}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1 text-[#9ca3af] text-xs flex-shrink-0">
             <CalendarDays size={12} />
             {proyecto.anio}
           </div>

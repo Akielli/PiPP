@@ -3,10 +3,12 @@ import { Link, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
   AlertTriangle,
+  AlertCircle,
   FileX,
   Banknote,
   Building2,
   Calendar,
+  Clock,
   MapPin,
   Hash,
   Users,
@@ -41,6 +43,12 @@ const MODALIDAD_LABEL: Record<string, string> = {
   invitacion_restringida: 'Invitación restringida',
   licitacion: 'Licitación pública',
 }
+
+const PLAZO_CONFIG = {
+  a_tiempo:  { label: 'A tiempo',  badgeBg: '#d1fae5', badgeText: '#065f46', dot: '#059669' },
+  retrasado: { label: 'Retrasado', badgeBg: '#fef3e2', badgeText: '#92400e', dot: '#d97706' },
+  detenido:  { label: 'Detenido',  badgeBg: '#fee2e2', badgeText: '#991b1b', dot: '#dc2626' },
+} as const
 
 const RIESGO_CONFIG = {
   alto: {
@@ -90,6 +98,10 @@ export default function Contrato() {
 
   const riesgo = contrato
     ? RIESGO_CONFIG[contrato.nivel_riesgo] ?? null
+    : null
+
+  const plazo = contrato?.estado_plazo
+    ? PLAZO_CONFIG[contrato.estado_plazo] ?? null
     : null
 
   return (
@@ -149,21 +161,37 @@ export default function Contrato() {
                 {contrato.proyecto.nombre}
               </h1>
 
-              {/* Semáforo de riesgo */}
-              {riesgo && (
-                <span
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold"
-                  style={{ backgroundColor: riesgo.badgeBg, color: riesgo.badgeText }}
-                  aria-label={`Nivel de riesgo: ${riesgo.label}`}
-                >
+              {/* Semáforos: riesgo + plazo */}
+              <div className="flex flex-wrap gap-2">
+                {riesgo && (
                   <span
-                    className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: riesgo.dot }}
-                    aria-hidden="true"
-                  />
-                  Riesgo {riesgo.label}
-                </span>
-              )}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold"
+                    style={{ backgroundColor: riesgo.badgeBg, color: riesgo.badgeText }}
+                    aria-label={`Nivel de riesgo: ${riesgo.label}`}
+                  >
+                    <span
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: riesgo.dot }}
+                      aria-hidden="true"
+                    />
+                    Riesgo {riesgo.label}
+                  </span>
+                )}
+                {plazo && (
+                  <span
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold"
+                    style={{ backgroundColor: plazo.badgeBg, color: plazo.badgeText }}
+                    aria-label={`Estado de plazo: ${plazo.label}`}
+                  >
+                    <span
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: plazo.dot }}
+                      aria-hidden="true"
+                    />
+                    {plazo.label}
+                  </span>
+                )}
+              </div>
             </>
           )}
 
@@ -249,7 +277,10 @@ export default function Contrato() {
               </div>
             </Section>
 
-            {/* ── 2. Empresa contratada ──────────────────────────────────── */}
+            {/* ── 2. Plazos de ejecución ────────────────────────────────── */}
+            <SeccionPlazos contrato={contrato} />
+
+            {/* ── 3. Empresa contratada ──────────────────────────────────── */}
             <Section title="Empresa contratada">
               <div className="space-y-4">
                 <div>
@@ -285,7 +316,7 @@ export default function Contrato() {
               </div>
             </Section>
 
-            {/* ── 3. Beneficiarios ───────────────────────────────────────── */}
+            {/* ── 4. Beneficiarios ───────────────────────────────────────── */}
             <Section
               title="¿Quién controla esta empresa?"
               subtitle="Beneficiarios finales registrados"
@@ -303,7 +334,7 @@ export default function Contrato() {
               </div>
             </Section>
 
-            {/* ── 4. Nota de responsabilidad ─────────────────────────────── */}
+            {/* ── 5. Nota de responsabilidad ─────────────────────────────── */}
             <div
               className="rounded-xl p-5 flex gap-3"
               style={{ backgroundColor: '#f0efe9', borderLeft: '3px solid #d1cfc9' }}
@@ -330,6 +361,114 @@ export default function Contrato() {
 }
 
 // ── Componentes de soporte ────────────────────────────────────────────────────
+
+const formatFechaCorta = (iso: string) => {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('es-MX', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+function SeccionPlazos({ contrato }: { contrato: ContratoDetalle }) {
+  const hoyISO = new Date().toISOString().slice(0, 10)
+
+  const etapas = [
+    {
+      label: 'Contratación',
+      plan: contrato.fecha_contratacion_plan,
+      real: contrato.fecha_contratacion_real,
+      sinReal: 'Aún sin firmar',
+    },
+    {
+      label: 'Inicio de obra',
+      plan: contrato.fecha_inicio_plan,
+      real: contrato.fecha_inicio_real,
+      sinReal: 'Aún sin iniciar',
+    },
+    {
+      label: 'Término',
+      plan: contrato.fecha_termino_plan,
+      real: contrato.fecha_termino_real,
+      sinReal: 'Sin concluir',
+    },
+  ]
+
+  return (
+    <Section
+      title="Plazos de ejecución"
+      icon={<Clock size={16} className="text-[#9ca3af]" />}
+    >
+      <div>
+        {etapas.map((e, i) => {
+          const tardanza = !!(e.plan && e.real && e.real > e.plan)
+          const vencida  = !!(e.plan && !e.real && hoyISO > e.plan)
+          return (
+            <div
+              key={e.label}
+              className={i > 0 ? 'pt-5 mt-5 border-t border-[#f0efe9]' : ''}
+            >
+              <p className="text-[11px] font-semibold text-[#9ca3af] uppercase tracking-wider mb-3">
+                {e.label}
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                {/* Fecha planeada */}
+                <div>
+                  <p className="text-[10px] text-[#b0ada6] uppercase tracking-wide mb-1">
+                    Planeado
+                  </p>
+                  <p className="text-sm text-[#1b2032]">
+                    {e.plan ? formatFechaCorta(e.plan) : '—'}
+                  </p>
+                </div>
+
+                {/* Fecha real */}
+                <div>
+                  <p className="text-[10px] text-[#b0ada6] uppercase tracking-wide mb-1">
+                    Real
+                  </p>
+                  {e.real ? (
+                    <div>
+                      <p
+                        className="text-sm"
+                        style={{ color: tardanza ? '#d97706' : '#1b2032' }}
+                      >
+                        {formatFechaCorta(e.real)}
+                      </p>
+                      {tardanza && (
+                        <p className="text-[10px] font-semibold mt-0.5" style={{ color: '#d97706' }}>
+                          Con retraso
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <p
+                        className="text-sm"
+                        style={{ color: vencida ? '#dc2626' : '#6b7280' }}
+                      >
+                        {e.sinReal}
+                      </p>
+                      {vencida && (
+                        <AlertCircle
+                          size={13}
+                          className="flex-shrink-0"
+                          style={{ color: '#dc2626' }}
+                          aria-label="Plazo vencido"
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </Section>
+  )
+}
 
 function Section({
   title,

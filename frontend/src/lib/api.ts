@@ -15,6 +15,7 @@ export type ContratoResumen = {
   monto: number
   avance_pct: number
   nivel_riesgo: 'bajo' | 'medio' | 'alto'
+  estado_plazo: 'a_tiempo' | 'retrasado' | 'detenido' | null
 }
 
 export type ProyectoConContrato = {
@@ -80,6 +81,13 @@ export type ContratoDetalle = {
   monto: number
   avance_pct: number
   nivel_riesgo: 'bajo' | 'medio' | 'alto'
+  estado_plazo: 'a_tiempo' | 'retrasado' | 'detenido' | null
+  fecha_contratacion_plan: string | null  // "YYYY-MM-DD"
+  fecha_contratacion_real: string | null
+  fecha_inicio_plan: string | null
+  fecha_inicio_real: string | null
+  fecha_termino_plan: string | null
+  fecha_termino_real: string | null
   proyecto: ProyectoInfo
   empresa: EmpresaInfo
 }

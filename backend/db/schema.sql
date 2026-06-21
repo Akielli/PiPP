@@ -51,8 +51,23 @@ CREATE TABLE IF NOT EXISTS contrato (
     monto       NUMERIC(14, 2) NOT NULL,
     avance_pct  SMALLINT       NOT NULL CHECK (avance_pct >= 0 AND avance_pct <= 100),
     nivel_riesgo TEXT          NOT NULL
-        CHECK (nivel_riesgo IN ('bajo', 'medio', 'alto'))
+        CHECK (nivel_riesgo IN ('bajo', 'medio', 'alto')),
+    -- Fechas de ejecución (planeadas vs. reales)
+    fecha_contratacion_plan  DATE,
+    fecha_contratacion_real  DATE,
+    fecha_inicio_plan        DATE,
+    fecha_inicio_real        DATE,
+    fecha_termino_plan       DATE,
+    fecha_termino_real       DATE
 );
+
+-- Migración: añadir columnas de fechas si la tabla ya existe sin ellas
+ALTER TABLE contrato ADD COLUMN IF NOT EXISTS fecha_contratacion_plan DATE;
+ALTER TABLE contrato ADD COLUMN IF NOT EXISTS fecha_contratacion_real DATE;
+ALTER TABLE contrato ADD COLUMN IF NOT EXISTS fecha_inicio_plan       DATE;
+ALTER TABLE contrato ADD COLUMN IF NOT EXISTS fecha_inicio_real       DATE;
+ALTER TABLE contrato ADD COLUMN IF NOT EXISTS fecha_termino_plan      DATE;
+ALTER TABLE contrato ADD COLUMN IF NOT EXISTS fecha_termino_real      DATE;
 
 -- Índices para búsquedas frecuentes
 CREATE INDEX IF NOT EXISTS idx_proyecto_ut        ON proyecto(ut_id);

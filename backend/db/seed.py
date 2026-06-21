@@ -126,27 +126,83 @@ PROYECTOS = [
 
 
 # ── Contratos ─────────────────────────────────────────────────────────────────
-#    E1 gana 3 contratos (todos adjudicacion_directa o invitacion_restringida,
-#    todos nivel_riesgo=alto) — patrón que el tablero debe resaltar.
+#    E1 gana 3 contratos (todos riesgo alto) — los 3 quedan DETENIDOS con avance bajo.
+#    Fechas ancladas a hoy 2026-06-21.
+#
+#    Distribución de estado_plazo (calculado en Python, no almacenado en BD):
+#      a_tiempo : P[2], P[4], P[8], P[9], P[12], P[14]  — 6 contratos
+#      retrasado: P[1], P[5], P[7], P[13]                — 4 contratos
+#      detenido : P[0], P[3], P[6], P[10], P[11], P[15] — 6 contratos (3 son CIA/E1)
+#
+# Cada tupla: (proyecto_id, empresa_id, modalidad, monto, avance_pct, nivel_riesgo,
+#              contratacion_plan, contratacion_real,
+#              inicio_plan,       inicio_real,
+#              termino_plan,      termino_real)
 
 CONTRATOS = [
-    # proyecto_id  empresa_id  modalidad                      monto          avance  riesgo
-    (P[0],  E1,  "adjudicacion_directa",    3_100_000.00,  85, "alto"),
-    (P[1],  E4,  "licitacion",              8_500_000.00,  62, "medio"),
-    (P[2],  E2,  "invitacion_restringida",  4_950_000.00, 100, "bajo"),
-    (P[3],  E7,  "adjudicacion_directa",    2_380_000.00,  45, "medio"),
-    (P[4],  E8,  "licitacion",              1_920_000.00, 100, "bajo"),
-    (P[5],  E5,  "invitacion_restringida",  6_650_000.00,  78, "alto"),
-    (P[6],  E1,  "adjudicacion_directa",   12_200_000.00,  30, "alto"),
-    (P[7],  E3,  "licitacion",              7_180_000.00,  55, "medio"),
-    (P[8],  E4,  "invitacion_restringida",  8_950_000.00,  90, "bajo"),
-    (P[9],  E7,  "adjudicacion_directa",    3_580_000.00,  70, "medio"),
-    (P[10], E3,  "licitacion",             10_900_000.00,  40, "alto"),
-    (P[11], E1,  "invitacion_restringida",  8_760_000.00,  15, "alto"),
-    (P[12], E6,  "adjudicacion_directa",    4_480_000.00,  88, "bajo"),
-    (P[13], E6,  "licitacion",              7_100_000.00,  60, "medio"),
-    (P[14], E2,  "invitacion_restringida",  5_700_000.00,  95, "bajo"),
-    (P[15], E10, "adjudicacion_directa",    2_100_000.00,  25, "medio"),
+    # P[0] CIA — banquetas — DETENIDO (avance=30 <50, termino_plan 2024-11-30 ya pasó)
+    (P[0],  E1,  "adjudicacion_directa",    3_100_000.00,  30, "alto",
+     date(2022,10, 1), date(2022,10,20), date(2022,12, 1), date(2023, 1,15), date(2024,11,30), None),
+
+    # P[1] SUT — área deportiva — RETRASADO (avance=62 ≥50, termino_plan 2025-05-31 ya pasó)
+    (P[1],  E4,  "licitacion",              8_500_000.00,  62, "medio",
+     date(2023, 4, 1), date(2023, 4,15), date(2023, 6, 1), date(2023, 6,15), date(2025, 5,31), None),
+
+    # P[2] GCP — pavimentación — A_TIEMPO (terminó 2022-07-25, antes del plan 2022-07-31)
+    (P[2],  E2,  "invitacion_restringida",  4_950_000.00, 100, "bajo",
+     date(2021, 6,15), date(2021, 6,20), date(2021, 8, 1), date(2021, 8, 5), date(2022, 7,31), date(2022, 7,25)),
+
+    # P[3] MIC — alumbrado — DETENIDO (avance=45 <50, termino_plan 2025-08-31 ya pasó)
+    (P[3],  E7,  "adjudicacion_directa",    2_380_000.00,  45, "medio",
+     date(2023, 7,15), date(2023, 7,20), date(2023, 9, 1), date(2023, 9,10), date(2025, 8,31), None),
+
+    # P[4] OPM — parque vecinal — A_TIEMPO (terminó 2023-02-10, antes del plan 2023-02-14)
+    (P[4],  E8,  "licitacion",              1_920_000.00, 100, "bajo",
+     date(2022, 1,10), date(2022, 1,15), date(2022, 2,15), date(2022, 2,20), date(2023, 2,14), date(2023, 2,10)),
+
+    # P[5] POC — drenaje sanitario — RETRASADO (avance=78 ≥50, termino_plan 2023-10-31 ya pasó)
+    (P[5],  E5,  "invitacion_restringida",  6_650_000.00,  78, "alto",
+     date(2021, 9,15), date(2021, 9,20), date(2021,11, 1), date(2021,11,10), date(2023,10,31), None),
+
+    # P[6] CIA — mercado municipal — DETENIDO (avance=30 <50, termino_plan 2025-03-14 ya pasó)
+    (P[6],  E1,  "adjudicacion_directa",   12_200_000.00,  30, "alto",
+     date(2023, 1,15), date(2023, 2,10), date(2023, 3,15), date(2023, 4,20), date(2025, 3,14), None),
+
+    # P[7] IVM — vialidad primaria — RETRASADO (avance=55 ≥50, termino_plan 2024-09-30 ya pasó)
+    (P[7],  E3,  "licitacion",              7_180_000.00,  55, "medio",
+     date(2022, 8, 1), date(2022, 8,10), date(2022,10, 1), date(2022,10,15), date(2024, 9,30), None),
+
+    # P[8] SUT — biblioteca — A_TIEMPO (en curso, termino_plan 2026-09-30 aún no llega)
+    (P[8],  E4,  "invitacion_restringida",  8_950_000.00,  90, "bajo",
+     date(2024, 1,15), date(2024, 1,20), date(2024, 3, 1), date(2024, 3,10), date(2026, 9,30), None),
+
+    # P[9] MIC — espacios públicos — A_TIEMPO (en curso, termino_plan 2026-10-31 aún no llega)
+    (P[9],  E7,  "adjudicacion_directa",    3_580_000.00,  70, "medio",
+     date(2024, 3, 1), date(2024, 3, 8), date(2024, 4,15), date(2024, 4,20), date(2026,10,31), None),
+
+    # P[10] IVM — unidad deportiva — DETENIDO (avance=40 <50, termino_plan 2024-07-31 ya pasó)
+    (P[10], E3,  "licitacion",             10_900_000.00,  40, "alto",
+     date(2022, 6, 1), date(2022, 6, 5), date(2022, 8, 1), date(2022, 8,10), date(2024, 7,31), None),
+
+    # P[11] CIA — centro comunitario — DETENIDO (avance=15 <50, termino_plan 2025-07-31 ya pasó)
+    (P[11], E1,  "invitacion_restringida",  8_760_000.00,  15, "alto",
+     date(2023, 6, 1), date(2023, 7, 1), date(2023, 8, 1), date(2023,10,15), date(2025, 7,31), None),
+
+    # P[12] CAV — caminos rurales — A_TIEMPO (en curso, termino_plan 2026-09-14 aún no llega)
+    (P[12], E6,  "adjudicacion_directa",    4_480_000.00,  88, "bajo",
+     date(2023, 8, 1), date(2023, 8,10), date(2023, 9,15), date(2023, 9,20), date(2026, 9,14), None),
+
+    # P[13] CAV — captación pluvial — RETRASADO (avance=60 ≥50, termino_plan 2025-12-31 ya pasó)
+    (P[13], E6,  "licitacion",              7_100_000.00,  60, "medio",
+     date(2023,11, 1), date(2023,11, 5), date(2024, 1,15), date(2024, 1,20), date(2025,12,31), None),
+
+    # P[14] GCP — vialidades y accesos — A_TIEMPO (en curso, termino_plan 2026-08-31 aún no llega)
+    (P[14], E2,  "invitacion_restringida",  5_700_000.00,  95, "bajo",
+     date(2024, 4, 1), date(2024, 4, 5), date(2024, 5,15), date(2024, 5,20), date(2026, 8,31), None),
+
+    # P[15] DUO — módulo sanitario — DETENIDO (avance=25 <50, termino_plan 2025-11-30 ya pasó)
+    (P[15], E10, "adjudicacion_directa",    2_100_000.00,  25, "medio",
+     date(2023,10, 1), date(2023,10, 8), date(2023,12, 1), date(2023,12,10), date(2025,11,30), None),
 ]
 
 
@@ -195,8 +251,11 @@ async def seed():
             print("Insertando contratos...")
             await conn.executemany(
                 """INSERT INTO contrato
-                   (id, proyecto_id, empresa_id, modalidad, monto, avance_pct, nivel_riesgo)
-                   VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6)""",
+                   (id, proyecto_id, empresa_id, modalidad, monto, avance_pct, nivel_riesgo,
+                    fecha_contratacion_plan, fecha_contratacion_real,
+                    fecha_inicio_plan,       fecha_inicio_real,
+                    fecha_termino_plan,      fecha_termino_real)
+                   VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)""",
                 CONTRATOS,
             )
 
