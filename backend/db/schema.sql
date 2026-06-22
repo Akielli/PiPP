@@ -69,8 +69,30 @@ ALTER TABLE contrato ADD COLUMN IF NOT EXISTS fecha_inicio_real       DATE;
 ALTER TABLE contrato ADD COLUMN IF NOT EXISTS fecha_termino_plan      DATE;
 ALTER TABLE contrato ADD COLUMN IF NOT EXISTS fecha_termino_real      DATE;
 
+-- =============================================================================
+-- Portal de carga: autenticación y roles
+-- =============================================================================
+
+-- Usuarios del portal de carga (NO son ciudadanos; el tablero público no usa login)
+CREATE TABLE IF NOT EXISTS usuario (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    username      TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,                 -- bcrypt; nunca texto plano
+    rol           TEXT NOT NULL
+        CHECK (rol IN ('iecm', 'alcaldia')),
+    alcaldia      TEXT                            -- NULL para iecm; nombre para alcaldia
+);
+
+-- Sesiones activas: el token (UUID opaco) viaja en una cookie HttpOnly
+CREATE TABLE IF NOT EXISTS sesion (
+    token       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    usuario_id  UUID NOT NULL REFERENCES usuario(id) ON DELETE CASCADE,
+    creada_en   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Índices para búsquedas frecuentes
 CREATE INDEX IF NOT EXISTS idx_proyecto_ut        ON proyecto(ut_id);
 CREATE INDEX IF NOT EXISTS idx_contrato_proyecto  ON contrato(proyecto_id);
 CREATE INDEX IF NOT EXISTS idx_contrato_empresa   ON contrato(empresa_id);
 CREATE INDEX IF NOT EXISTS idx_beneficiario_empresa ON beneficiario(empresa_id);
+CREATE INDEX IF NOT EXISTS idx_sesion_usuario     ON sesion(usuario_id);

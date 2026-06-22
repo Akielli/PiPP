@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from config import settings
 from router import router
+from auth import auth_router
 
 
 @asynccontextmanager
@@ -19,11 +20,13 @@ app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
+    allow_credentials=True,   # permite enviar/recibir la cookie de sesión
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 app.include_router(router)
+app.include_router(auth_router)
 
 
 @app.get("/api/health")

@@ -11,6 +11,7 @@ from datetime import date
 from pathlib import Path
 
 import asyncpg
+import bcrypt
 from dotenv import load_dotenv
 import os
 
@@ -20,6 +21,10 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 
 def uid() -> str:
     return str(uuid.uuid4())
+
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 # ── IDs fijos para poder cruzar las llaves foráneas ───────────────────────────
@@ -206,6 +211,18 @@ CONTRATOS = [
 ]
 
 
+# ── Usuarios del portal de carga (demo) ───────────────────────────────────────
+#    Contraseñas en texto solo aquí, para sembrar; en la BD se guardan hasheadas.
+#    Las alcaldías deben coincidir EXACTAMENTE con las de UNIDADES.
+
+USUARIOS = [
+    # username       password         rol          alcaldia
+    ("iecm",        "Iecm2026!",      "iecm",      None),
+    ("iztapalapa",  "Izta2026!",      "alcaldia",  "Iztapalapa"),
+    ("gam",         "Gam2026!",       "alcaldia",  "Gustavo A. Madero"),
+]
+
+
 # ── Inserción ─────────────────────────────────────────────────────────────────
 
 async def seed():
@@ -216,7 +233,8 @@ async def seed():
 
             print("Limpiando tablas...")
             await conn.execute("""
-                TRUNCATE contrato, beneficiario, proyecto, empresa, unidad_territorial
+                TRUNCATE contrato, beneficiario, proyecto, empresa, unidad_territorial,
+                         sesion, usuario
                 CASCADE
             """)
 
@@ -259,13 +277,20 @@ async def seed():
                 CONTRATOS,
             )
 
+            print("Insertando usuarios del portal...")
+            await conn.executemany(
+                """INSERT INTO usuario (id, username, password_hash, rol, alcaldia)
+                   VALUES (gen_random_uuid(), $1, $2, $3, $4)""",
+                [(u, hash_password(pw), rol, alc) for (u, pw, rol, alc) in USUARIOS],
+            )
+
     await pool.close()
 
     # Resumen
     pool2 = await asyncpg.create_pool(DATABASE_URL)
     async with pool2.acquire() as conn:
         print("\n── Filas por tabla ──────────────────────────")
-        for tabla in ["unidad_territorial", "empresa", "proyecto", "beneficiario", "contrato"]:
+        for tabla in ["unidad_territorial", "empresa", "proyecto", "beneficiario", "contrato", "usuario"]:
             n = await conn.fetchval(f"SELECT COUNT(*) FROM {tabla}")
             print(f"  {tabla:<25} {n:>3} filas")
     await pool2.close()

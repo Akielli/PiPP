@@ -3,6 +3,17 @@ from uuid import UUID
 from pydantic import BaseModel
 
 
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class UsuarioActual(BaseModel):
+    username: str
+    rol: str
+    alcaldia: str | None = None
+
+
 class UnidadResumen(BaseModel):
     id: UUID
     nombre: str

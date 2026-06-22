@@ -118,3 +118,35 @@ export async function fetchProyectosMapa(): Promise<ProyectoMapa[]> {
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return res.json()
 }
+
+// ── Autenticación del portal de carga ─────────────────────────────────────────
+//    Todas usan credentials: 'include' para enviar/recibir la cookie de sesión.
+
+export type UsuarioActual = {
+  username: string
+  rol: 'iecm' | 'alcaldia'
+  alcaldia: string | null
+}
+
+export async function login(username: string, password: string): Promise<UsuarioActual> {
+  const res = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ username, password }),
+  })
+  if (res.status === 401) throw Object.assign(new Error('CREDENCIALES'), { status: 401 })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+}
+
+export async function logout(): Promise<void> {
+  await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+}
+
+export async function fetchMe(): Promise<UsuarioActual> {
+  const res = await fetch('/api/auth/me', { credentials: 'include' })
+  if (res.status === 401) throw Object.assign(new Error('NO_SESSION'), { status: 401 })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+}
