@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#000000" />
+  <title>PiPP · Realidad aumentada</title>
+  <style>
+    :root { --accent: #7c5cff; --fg: #fff; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: #000; color: var(--fg);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+
+    /* El "escenario" tiene exactamente la proporción del video y se escala para cubrir la pantalla.
+       Video y canvas 3D comparten el mismo rectángulo, así la animación queda alineada con el QR. */
+    #stage { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+    #stage video, #stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+    #intro { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 16px; padding: 24px; text-align: center;
+      background: radial-gradient(circle at 50% 30%, #2a1f5c, #000 70%); z-index: 10; }
+    #intro h1 { margin: 0; font-size: 1.6rem; }
+    #intro p { margin: 0; max-width: 32ch; opacity: .8; line-height: 1.4; }
+    button { font: inherit; font-weight: 600; font-size: 1.1rem; color: #fff; background: var(--accent);
+      border: 0; border-radius: 999px; padding: 14px 28px; cursor: pointer; }
+    #error { color: #ff8a8a; min-height: 1.2em; }
+
+    #hud { position: fixed; left: 0; right: 0; bottom: 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+      text-align: center; pointer-events: none; z-index: 5; }
+    #status { display: inline-block; background: rgba(0,0,0,.55); backdrop-filter: blur(6px);
+      padding: 8px 14px; border-radius: 999px; font-size: .95rem; max-width: 100%;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Marco guía mientras no hay QR */
+    #guide { position: fixed; left: 50%; top: 50%; width: 60vmin; height: 60vmin; transform: translate(-50%, -50%);
+      border: 3px dashed rgba(255,255,255,.6); border-radius: 16px; pointer-events: none; z-index: 4;
+      transition: opacity .3s; }
+    #guide.hidden { opacity: 0; }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <video id="video" playsinline muted autoplay></video>
+    <canvas id="three"></canvas>
+  </div>
+
+  <div id="guide" class="hidden"></div>
+  <div id="hud"><span id="status">Iniciando…</span></div>
+
+  <div id="intro">
+    <h1>Realidad aumentada</h1>
+    <p>Apunta la cámara a un código QR y aparecerá una animación en 3D sobre él.</p>
+    <button id="start">Abrir cámara</button>
+    <div id="error"></div>
+  </div>
+
+  <!-- jsQR: decodifica el QR y devuelve las 4 esquinas en la imagen -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+
+    const $ = (id) => document.getElementById(id);
+    const video = $('video'), stage = $('stage'), statusEl = $('status'), guide = $('guide');
+
+    // ---------- Configuración ----------
+    const CAMERA_HFOV_DEG = 63;   // campo de visión horizontal aproximado de la cámara trasera de un celular
+    const SCAN_MAX_WIDTH = 640;   // resolución a la que se analiza cada cuadro (más bajo = más rápido)
+    const LOST_AFTER_MS = 600;    // tiempo sin ver el QR antes de ocultar la animación
+    const SMOOTHING = 0.35;       // 0 = sin movimiento, 1 = sin suavizado
+
+    // ---------- Three.js ----------
+    const renderer = new THREE.WebGLRenderer({ canvas: $('three'), alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(50, 4 / 3, 0.01, 100);
+
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x404060, 1.2));
+    const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+    sun.position.set(1, 2, 3);
+    scene.add(sun);
+
+    // "anchor" sigue al QR. El QR mide 1 unidad de lado; su eje Z sale del QR hacia la cámara.
+    const anchor = new THREE.Group();
+    anchor.visible = false;
+    scene.add(anchor);
+
+    // "content" está rotado para que su eje Y apunte hacia afuera del QR: así el contenido "se para" sobre él.
+    const content = new THREE.Group();
+    content.rotation.x = Math.PI / 2;
+    anchor.add(content);
+
+    // --- La animación 3D ---
+    const base = new THREE.Mesh(
+      new THREE.RingGeometry(0.45, 0.55, 64),
+      new THREE.MeshBasicMaterial({ color: 0x7c5cff, transparent: true, opacity: 0.8, side: THREE.DoubleSide })
+    );
+    base.rotation.x = -Math.PI / 2;
+    content.add(base);
+
+    const hero = new THREE.Mesh(
+      new THREE.TorusKnotGeometry(0.22, 0.07, 160, 24),
+      new THREE.MeshStandardMaterial({ color: 0xff4f9a, metalness: 0.4, roughness: 0.25 })
+    );
+    content.add(hero);
+
+    const orbiters = new THREE.Group();
+    const colors = [0x35d0ff, 0xffd23f, 0x5cff9d, 0xff7a45, 0xb38cff, 0xffffff];
+    colors.forEach((c, i) => {
+      const cube = new THREE.Mesh(
+        new THREE.BoxGeometry(0.08, 0.08, 0.08),
+        new THREE.MeshStandardMaterial({ color: c, metalness: 0.2, roughness: 0.4 })
+      );
+      const a = (i / colors.length) * Math.PI * 2;
+      cube.position.set(Math.cos(a) * 0.5, 0, Math.sin(a) * 0.5);
+      orbiters.add(cube);
+    });
+    content.add(orbiters);
+
+    let appear = 0; // 0..1 animación de aparición
+    function animateContent(t, dt, target) {
+      appear += (target - appear) * Math.min(1, dt * 6);
+      const s = easeOutBack(appear);
+      content.scale.setScalar(Math.max(s, 0.0001));
+
+      hero.position.y = 0.55 + Math.sin(t * 2) * 0.08;
+      hero.rotation.set(t * 0.7, t * 1.1, 0);
+      orbiters.position.y = 0.4 + Math.sin(t * 1.3) * 0.05;
+      orbiters.rotation.y = t * 1.5;
+      orbiters.children.forEach((c, i) => { c.rotation.x = t * 2 + i; c.rotation.y = t * 3 + i; });
+      base.scale.setScalar(1 + Math.sin(t * 3) * 0.05);
+    }
+    function easeOutBack(x) { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); }
+
+    // ---------- Cámara ----------
+    let focal = 1, vw = 640, vh = 480;
+    const scanCanvas = document.createElement('canvas');
+    const scanCtx = scanCanvas.getContext('2d', { willReadFrequently: true });
+
+    $('start').addEventListener('click', start);
+
+    async function start() {
+      $('error').textContent = '';
+      if (!navigator.mediaDevices?.getUserMedia) {
+        $('error').textContent = 'Tu navegador no permite usar la cámara. Abre la liga con HTTPS en Chrome o Safari.';
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+        });
+        video.srcObject = stream;
+        await video.play();
+      } catch (e) {
+        $('error').textContent = 'No se pudo abrir la cámara: ' + (e.message || e.name);
+        return;
+      }
+      $('intro').style.display = 'none';
+      guide.classList.remove('hidden');
+      statusEl.textContent = 'Busca un código QR…';
+      layout();
+      requestAnimationFrame(loop);
+    }
+
+    function layout() {
+      vw = video.videoWidth || 640; vh = video.videoHeight || 480;
+      const scale = Math.max(innerWidth / vw, innerHeight / vh); // como object-fit: cover
+      const w = vw * scale, h = vh * scale;
+      stage.style.width = w + 'px'; stage.style.height = h + 'px';
+      renderer.setSize(w, h, false);
+
+      // Cámara virtual con la misma proyección que la cámara real (en píxeles del video)
+      focal = (vw / 2) / Math.tan(THREE.MathUtils.degToRad(CAMERA_HFOV_DEG) / 2);
+      camera.aspect = vw / vh;
+      camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan((vh / 2) / focal));
+      camera.updateProjectionMatrix();
+
+      const s = Math.min(1, SCAN_MAX_WIDTH / vw);
+      scanCanvas.width = Math.round(vw * s); scanCanvas.height = Math.round(vh * s);
+    }
+    addEventListener('resize', layout);
+    video.addEventListener('loadedmetadata', layout);
+
+    // ---------- Pose del QR a partir de sus 4 esquinas ----------
+    // Resuelve la homografía H (cuadrado unitario -> puntos normalizados de imagen)
+    function homography(src, dst) {
+      const A = [], b = [];
+      for (let i = 0; i < 4; i++) {
+        const [X, Y] = src[i], [x, y] = dst[i];
+        A.push([X, Y, 1, 0, 0, 0, -x * X, -x * Y]); b.push(x);
+        A.push([0, 0, 0, X, Y, 1, -y * X, -y * Y]); b.push(y);
+      }
+      const h = solve(A, b);
+      return h && [...h, 1];
+    }
+    function solve(A, b) { // eliminación gaussiana con pivoteo
+      const n = b.length, M = A.map((r, i) => [...r, b[i]]);
+      for (let c = 0; c < n; c++) {
+        let p = c;
+        for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+        if (Math.abs(M[p][c]) < 1e-12) return null;
+        [M[c], M[p]] = [M[p], M[c]];
+        for (let r = 0; r < n; r++) {
+          if (r === c) continue;
+          const f = M[r][c] / M[c][c];
+          for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k];
+        }
+      }
+      return M.map((r, i) => r[n] / r[i]);
+    }
+
+    const tmpM = new THREE.Matrix4();
+    const targetPos = new THREE.Vector3(), targetQuat = new THREE.Quaternion(), tmpScale = new THREE.Vector3();
+    let hasPose = false;
+
+    function poseFromCorners(loc, k) {
+      // Esquinas del QR en coordenadas del objeto (lado = 1, Y hacia arriba)
+      const obj = [[-0.5, 0.5], [0.5, 0.5], [0.5, -0.5], [-0.5, -0.5]];
+      const pts = [loc.topLeftCorner, loc.topRightCorner, loc.bottomRightCorner, loc.bottomLeftCorner]
+        .map(p => [(p.x * k - vw / 2) / focal, (p.y * k - vh / 2) / focal]);
+      const H = homography(obj, pts);
+      if (!H) return false;
+
+      // H = λ [r1 r2 t]   (convención OpenCV: x derecha, y abajo, z hacia adelante)
+      let r1 = new THREE.Vector3(H[0], H[3], H[6]);
+      let r2 = new THREE.Vector3(H[1], H[4], H[7]);
+      let t  = new THREE.Vector3(H[2], H[5], H[8]);
+      let lambda = 2 / (r1.length() + r2.length());
+      if (t.z < 0) lambda = -lambda; // el QR debe estar frente a la cámara
+      r1.multiplyScalar(lambda); r2.multiplyScalar(lambda); t.multiplyScalar(lambda);
+
+      // Ortonormalizar la rotación
+      r1.normalize();
+      r2.sub(r1.clone().multiplyScalar(r1.dot(r2))).normalize();
+      const r3 = new THREE.Vector3().crossVectors(r1, r2);
+
+      // Pasar a la convención de Three.js (y arriba, z hacia atrás): multiplicar por diag(1,-1,-1)
+      tmpM.set(
+         r1.x,  r2.x,  r3.x,  t.x,
+        -r1.y, -r2.y, -r3.y, -t.y,
+        -r1.z, -r2.z, -r3.z, -t.z,
+         0, 0, 0, 1
+      );
+      tmpM.decompose(targetPos, targetQuat, tmpScale);
+      return true;
+    }
+
+    // ---------- Bucle principal ----------
+    let lastSeen = -Infinity, lastText = '', prev = performance.now();
+
+    function loop(now) {
+      const dt = Math.min(0.1, (now - prev) / 1000); prev = now;
+
+      if (video.readyState >= 2) {
+        scanCtx.drawImage(video, 0, 0, scanCanvas.width, scanCanvas.height);
+        const img = scanCtx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
+        const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+        if (code && poseFromCorners(code.location, vw / scanCanvas.width)) {
+          if (!hasPose || now - lastSeen > LOST_AFTER_MS) {
+            anchor.position.copy(targetPos); anchor.quaternion.copy(targetQuat);
+          } else {
+            anchor.position.lerp(targetPos, SMOOTHING);
+            anchor.quaternion.slerp(targetQuat, SMOOTHING);
+          }
+          hasPose = true;
+          lastSeen = now;
+          if (code.data !== lastText) {
+            lastText = code.data;
+            statusEl.textContent = code.data ? 'QR: ' + code.data : 'QR detectado';
+          }
+        }
+      }
+
+      const visible = hasPose && now - lastSeen < LOST_AFTER_MS;
+      anchor.visible = visible || appear > 0.02;
+      if (!visible && lastText) { lastText = ''; statusEl.textContent = 'Busca un código QR…'; }
+      guide.classList.toggle('hidden', visible);
+
+      animateContent(now / 1000, dt, visible ? 1 : 0);
+
+      renderer.render(scene, camera);
+      requestAnimationFrame(loop);
+    }
+
+    statusEl.textContent = 'Toca “Abrir cámara” para empezar';
+    window.__ar = { anchor, get visible() { return performance.now() - lastSeen < LOST_AFTER_MS; } }; // para pruebas
+  </script>
+</body>
+</html>
